@@ -9,49 +9,72 @@ module LDC
   @data = File.read(ARGV[0])
   @uri = URI.parse(ENV['LIBRATO_URL'] || raise("Must set $LIBRATO_URL"))
 
-  @met_attrs = %w(color display_max display_min display_units_long display_units_short display_stacked display_transform aggregate summarize_function)
-  @stream_attrs = %w(source group_function summary_function color)
+  @metric_attributes = %w(color display_max display_min display_units_long
+    display_units_short display_stacked display_transform
+    aggregate summarize_function)
+  @instrument_attributes = %w(display_stacked display_integral)
+  @stream_properties = %w(source group_function summary_function color)
 
   def self.create
     data = YAML.load(@data)
     dashboards = data.map do |dname, idata|
-      default_attributes = nil
+      $stdout.puts("Creating Dashboard: #{dname}")
+      instrument_defaults, metric_defaults = {}, {}
       instruments = idata.map do |iname, mdata|
-        if iname == "default-attributes"
-          default_attributes = mdata
+        if iname == "defaults"
+          instrument_defaults = mdata
           next
         end
+        $stdout.puts("\tCreating Instrument: #{iname}")
         metrics = mdata.map do |mname, mattrs|
-          create_metric(mname, mattrs.merge(default_attributes))
-        end
-        create_instrument(iname, metrics)
+          if mname == "defaults"
+            metric_defaults = mattrs
+            next
+          end
+          $stdout.puts("\t\tCreating Metric: #{mname}")
+          create_metric(mname,
+            mattrs.merge(instrument_defaults.merge(metric_defaults)))
+        end.compact
+        create_instrument(iname, metrics, instrument_defaults)
       end.compact
       create_dashboard(dname, instruments)
+    end.compact
+  end
+
+  def self.cleanup_dashboard(name)
+    result = get("/dashboards?name=#{name}")
+    if result["query"]["found"].to_i > 0
+      result["dashboards"].each do |d|
+        delete("/dashboards/#{d['id']}")
+      end
     end
   end
 
   def self.create_dashboard(name, instruments)
+    cleanup_dashboard(name)
     post("/dashboards", {
       "name" => name,
       "instruments" => instruments.map {|i| {"id" => i["response"]["id"]}}
     })
   end
 
-  def self.create_instrument(name, metrics)
+  def self.create_instrument(name, metrics, attrs)
     resp = post("/instruments", {
       "name" => name,
+      "attributes" => attrs.select {|k,v| @instrument_attributes.include?(k)},
       "streams" => metrics.map do |m|
-        sa = m["attrs"].select {|k,v| @stream_attrs.include?(k)}
-        {"metric" => m["response"]["name"]}.merge(sa)
+        sp = attrs.select {|k,v| @stream_properties.include?(k)}
+        {"metric" => m["response"]["name"]}.merge(sp)
       end
     })
     {"response" => resp}
   end
 
   def self.create_metric(name, attrs)
+    delete("/metrics/#{name}")
     resp = put("/metrics/#{name}", {
       "type" => attrs["type"],
-      "attributes" => attrs.select {|k,v| @met_attrs.include?(k)}
+      "attributes" => attrs.select {|k,v| @metric_attributes.include?(k)}
     })
     {"response" => resp, "attrs" => attrs}
   end
@@ -72,12 +95,29 @@ module LDC
     make_request(req)
   end
 
+  def self.delete(path)
+    p = @uri.path + path
+    req = Net::HTTP::Delete.new(p, {'Content-Type' =>'application/json'})
+    req.basic_auth(CGI.unescape(@uri.user), @uri.password)
+    make_request(req)
+  end
+
+  def self.get(path)
+    p = @uri.path + path
+    req = Net::HTTP::Get.new(p, {'Content-Type' =>'application/json'})
+    req.basic_auth(CGI.unescape(@uri.user), @uri.password)
+    make_request(req)
+  end
+
   def self.make_request(req)
     http = Net::HTTP.new(@uri.host, @uri.port)
     http.use_ssl = true
     http.set_debug_output($stdout) if ENV['DEBUG']
     resp = http.request(req)
-    JSON.parse(resp.body) if resp.body.length > 0
+    if (resp.code.to_i / 100) != 2
+      $stderr.puts("at=request-failed path=#{req.path}")
+    end
+    JSON.parse(resp.body) if resp.body && resp.body.length > 0
   end
 
 end
