@@ -19,23 +19,26 @@ module LDC
     data = YAML.load(@data)
     dashboards = data.map do |dname, idata|
       $stdout.puts("Creating Dashboard: #{dname}")
-      instrument_defaults, metric_defaults = {}, {}
+      dashboard_defaults, instrument_defaults= {}, {}
       instruments = idata.map do |iname, mdata|
         if iname == "defaults"
-          instrument_defaults = mdata
+          dashboard_defaults = mdata
           next
         end
         $stdout.puts("\tCreating Instrument: #{iname}")
         metrics = mdata.map do |mname, mattrs|
           if mname == "defaults"
-            metric_defaults = mattrs
+            instrument_defaults = mattrs
             next
           end
           $stdout.puts("\t\tCreating Metric: #{mname}")
           create_metric(mname,
-            mattrs.merge(instrument_defaults.merge(metric_defaults)))
+            mattrs.merge(dashboard_defaults.merge(instrument_defaults)))
         end.compact
-        create_instrument(iname, metrics, instrument_defaults)
+        create_instrument(iname, metrics,
+          instrument_defaults.merge(dashboard_defaults)).tap do
+            instrument_defaults = {}
+        end
       end.compact
       create_dashboard(dname, instruments)
     end.compact
