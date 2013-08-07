@@ -1,0 +1,86 @@
+#!/usr/bin/env ruby
+require 'net/http'
+require 'json'
+require 'uri'
+require 'cgi'
+require 'yaml'
+
+module LDC
+  @data = File.read(ARGV[0])
+  @uri = URI.parse(ENV['LIBRATO_URL'] || raise("Must set $LIBRATO_URL"))
+  @conn = Net::HTTP.new(@uri.host, @uri.port)
+
+  @reserved = %w(default-attributes)
+  @met_attrs = %w(color display_max display_min display_units_long display_units_short display_stacked display_transform aggregate summarize_function)
+  @stream_attrs = %w(source group_function summary_function color)
+
+  def self.create
+    data = YAML.load(@data)
+    dashboards = data.map do |dname, idata|
+      default_attributes = nil
+      instruments = idata.map do |iname, mdata|
+        if iname == "default-attributes"
+          default_attributes = mdata
+          next
+        end
+        metrics = mdata.map do |mname, mattrs|
+          create_metric(mname, mattrs.merge(default_attributes))
+        end
+        create_instrument(iname, metrics)
+      end.compact
+      create_dashboard(dname, instruments)
+    end
+  end
+
+  def self.create_dashboard(name, instruments)
+    post("/dashboards", {
+      "name" => name,
+      "instruments" => instruments.map {|i| {"id" => i["response"]["id"]}}
+    })
+  end
+
+  def self.create_instrument(name, metrics)
+    resp = post("/instruments", {
+      "name" => name,
+      "streams" => metrics.map do |m|
+        sa = m["attrs"].select {|k,v| @stream_attrs.include?(k)}
+        {"metric" => m["response"]["name"]}.merge(sa)
+      end
+    })
+    {"response" => resp}
+  end
+
+  def self.create_metric(name, attrs)
+    resp = put("/metrics/#{name}", {
+      "type" => attrs["type"],
+      "attributes" => attrs.select {|k,v| @met_attrs.include?(k)}
+    })
+    {"response" => resp, "attrs" => attrs}
+  end
+
+  def self.put(path, data)
+    p = @uri.path + path
+    req = Net::HTTP::Put.new(p, {'Content-Type' =>'application/json'})
+    req.basic_auth(CGI.unescape(@uri.user), @uri.password)
+    req.body = JSON.dump(data)
+    make_request(req)
+  end
+
+  def self.post(path, data)
+    p = @uri.path + path
+    req = Net::HTTP::Post.new(p, {'Content-Type' =>'application/json'})
+    req.basic_auth(CGI.unescape(@uri.user), @uri.password)
+    req.body = JSON.dump(data)
+    make_request(req)
+  end
+
+  def self.make_request(req)
+    http = Net::HTTP.new(@uri.host, @uri.port)
+    http.use_ssl = true
+    http.set_debug_output($stdout) if ENV['DEBUG']
+    resp = http.request(req)
+    JSON.parse(resp.body) if resp.body.length > 0
+  end
+
+end
+LDC.create if __FILE__ == $0

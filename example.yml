@@ -1,0 +1,22 @@
+---
+l2met:
+  default-attributes:
+    type: gauge
+    aggregate: true
+  http.throughput:
+    http.accept:
+      summarize_function: sum
+      group_function: sum
+      summary_function: count
+  receiver.throughput:
+    receiver.add-bucket:
+      summarize_function: sum
+      group_function: sum
+      summary_function: count
+  drops:
+    receiver.drop:
+      summarize_function: sum
+      color: '#FF4500'
+    outlet.drop:
+      summarize_function: sum
+      color: '#FF0000'

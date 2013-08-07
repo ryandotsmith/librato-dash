@@ -1,0 +1,9 @@
+Librato Dashboard Creator
+
+Usage
+	$ export LIBRATO_URL=https://u:p@metrics-api.librato.com/v1
+	$ ./librato-dash FILE
+
+Data Format
+
+	See example.yml
