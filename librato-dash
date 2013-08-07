@@ -8,9 +8,7 @@ require 'yaml'
 module LDC
   @data = File.read(ARGV[0])
   @uri = URI.parse(ENV['LIBRATO_URL'] || raise("Must set $LIBRATO_URL"))
-  @conn = Net::HTTP.new(@uri.host, @uri.port)
 
-  @reserved = %w(default-attributes)
   @met_attrs = %w(color display_max display_min display_units_long display_units_short display_stacked display_transform aggregate summarize_function)
   @stream_attrs = %w(source group_function summary_function color)
 
