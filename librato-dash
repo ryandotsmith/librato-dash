@@ -33,7 +33,7 @@ module LDC
           end
           $stdout.puts("\t\tCreating Metric: #{mname}")
           create_metric(mname,
-            mattrs.merge(dashboard_defaults.merge(instrument_defaults)))
+            (mattrs || {}).merge(dashboard_defaults.merge(instrument_defaults)))
         end.compact
         create_instrument(iname, metrics,
           instrument_defaults.merge(dashboard_defaults)).tap do
@@ -44,21 +44,28 @@ module LDC
     end.compact
   end
 
-  def self.cleanup_dashboard(name)
+  def self.find_dashboard(name)
     result = get("/dashboards?name=#{name}")
     if result["query"]["found"].to_i > 0
       result["dashboards"].each do |d|
-        delete("/dashboards/#{d['id']}")
+        return d if d['name'] == name
       end
+      return nil
     end
   end
 
   def self.create_dashboard(name, instruments)
-    cleanup_dashboard(name)
-    post("/dashboards", {
-      "name" => name,
-      "instruments" => instruments.map {|i| {"id" => i["id"]}}
-    })
+    if dashboard = find_dashboard(name)
+      put("/dashboards/#{dashboard['id']}", {
+        "name" => name,
+        "instruments" => instruments.map {|i| {"id" => i["id"]}}
+      })
+    else
+      post("/dashboards", {
+        "name" => name,
+        "instruments" => instruments.map {|i| {"id" => i["id"]}}
+      })
+    end
   end
 
   def self.cleanup_instruments
@@ -105,7 +112,7 @@ module LDC
   end
 
   def self.create_metric(name, attrs)
-    resp = put("/metrics/#{name}", {
+    put("/metrics/#{name}", {
       "type" => attrs["type"],
       "attributes" => attrs.select {|k,v| @metric_attributes.include?(k)}
     })
