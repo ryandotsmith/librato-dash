@@ -54,29 +54,60 @@ module LDC
     cleanup_dashboard(name)
     post("/dashboards", {
       "name" => name,
-      "instruments" => instruments.map {|i| {"id" => i["response"]["id"]}}
+      "instruments" => instruments.map {|i| {"id" => i["id"]}}
     })
+  end
+
+  def self.cleanup_instruments
+    finding = true
+    while finding
+      result = get("/instruments")
+      if result["query"]["found"].to_i > 0
+        result["instruments"].each do |i|
+          delete("/instruments/#{i['id']}")
+        end
+      else
+        finding = false
+      end
+    end
+  end
+
+  def self.find_instrument(name)
+    result = get("/instruments")
+    if result["query"]["found"].to_i > 0
+      result["instruments"].each do |instrument|
+        if instrument["name"] == name
+          puts instrument.class
+          return instrument
+        end
+      end
+      return nil
+    end
   end
 
   def self.create_instrument(name, metrics, attrs)
-    resp = post("/instruments", {
+    data = {
       "name" => name,
       "attributes" => attrs.select {|k,v| @instrument_attributes.include?(k)},
       "streams" => metrics.map do |m|
-        sp = attrs.select {|k,v| @stream_properties.include?(k)}
-        {"metric" => m["response"]["name"]}.merge(sp)
+        sp = attrs.merge(m).select {|k,v| @stream_properties.include?(k)}
+        {"metric" => m["name"]}.merge(sp)
       end
-    })
-    {"response" => resp}
+    }
+    if instrument = find_instrument(name)
+      put("/instruments/#{instrument['id']}", data)
+    else
+      instrument = post("/instruments", data)
+    end
+    get("/instruments/#{instrument['id']}").merge(attrs)
   end
 
   def self.create_metric(name, attrs)
-    delete("/metrics/#{name}")
     resp = put("/metrics/#{name}", {
       "type" => attrs["type"],
       "attributes" => attrs.select {|k,v| @metric_attributes.include?(k)}
     })
-    {"response" => resp, "attrs" => attrs}
+    get("/metrics/#{name}").merge(attrs)
   end
 
   def self.put(path, data)

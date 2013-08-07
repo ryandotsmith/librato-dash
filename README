@@ -1,9 +1,33 @@
 Librato Dashboard Creator
 
-Usage
+Usage:
+
 	$ export LIBRATO_URL=https://u:p@metrics-api.librato.com/v1
 	$ ./librato-dash FILE
 
-File Format
+File Format:
 
-	See example.yml
+	dashboard-name
+		defaults
+			any attribute
+		instrument-name
+			defaults
+				any attributes
+			metric-name-0
+				specific attributes
+			metric-name-1
+				specific attributes
+
+See example.yml
+
+Defaults:
+
+	You can sepcify a group of default attributes at the dashboard
+	and instrument level. The attributes can be: metrics attributes,
+	instrument attributes, or instrument stream attributes. Librato-dash
+	will make sure that the correct attribute gets associated with its
+	data type. For example, your dashboard defaults section can contain
+	defaults for both instrument attributes and metrics attributes and
+	librato-dash will use information about the Librato API to ensure
+	the the default instrument attributes are not associated with the
+	metric attributes and vise versa.
