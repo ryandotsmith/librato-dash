@@ -1,4 +1,5 @@
 ---
+# Start by creating a dashboard named l2met.
 l2met:
   # These attributes will be applied to all metrics.
   # default-attributes is a keyword which means you wont be able to
@@ -7,7 +8,7 @@ l2met:
     type: gauge
     aggregate: true
   
-  #Start out by creating a name for your new instrument.
+  #Next, create an instrument. We will call the first instrument http.throughput.
   http.throughput:
     # Then create metrics which will belong to the instrument.
     http.accept:
