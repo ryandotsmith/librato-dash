@@ -5,18 +5,18 @@ Usage:
 	$ export LIBRATO_URL=https://u:p@metrics-api.librato.com/v1
 	$ ./librato-dash FILE
 
-File Format:
+File Format: YAML
 
-	dashboard-name
-		defaults
-			any attribute
-		instrument-name
-			defaults
-				any attributes
-			metric-name-0
-				specific attributes
-			metric-name-1
-				specific attributes
+dashboard-name
+  defaults
+    any attribute
+  instrument-name
+    defaults
+      any attributes
+    metric-name-0
+      specific attributes
+    metric-name-1
+      specific attributes
 
 See example.yml
 
