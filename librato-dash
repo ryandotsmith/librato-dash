@@ -77,7 +77,6 @@ module LDC
     if result["query"]["found"].to_i > 0
       result["instruments"].each do |instrument|
         if instrument["name"] == name
-          puts instrument.class
           return instrument
         end
       end
